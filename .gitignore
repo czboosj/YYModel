@@ -1,6 +1,6 @@
 # OS X
 .DS_Store
-
+Benchmark/Pods
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore

@@ -15,6 +15,7 @@
 
 #define force_inline __inline__ __attribute__((always_inline))
 
+
 /// Foundation Class Type
 typedef NS_ENUM (NSUInteger, YYEncodingNSType) {
     YYEncodingTypeNSUnknown = 0,
@@ -35,6 +36,32 @@ typedef NS_ENUM (NSUInteger, YYEncodingNSType) {
     YYEncodingTypeNSMutableSet,
 };
 
+/**
+ * 解析Property的Attributed字符串，参考Stackoverflow
+ */
+static const char *getPropertyType(objc_property_t property) {
+    const char *attributes = property_getAttributes(property);
+    
+    //    NSLog(@"%s", attributes);
+    
+    char buffer[1 + strlen(attributes)];
+    strcpy(buffer, attributes);
+    char *state = buffer, *attribute;
+    while ((attribute = strsep(&state, ",")) != NULL) {
+        // 非对象类型
+        if (attribute[0] == 'T' && attribute[1] != '@') {
+            // 利用NSData复制一份字符串
+            return (const char *) [[NSData dataWithBytes:(attribute + 1) length:strlen(attribute) - 1] bytes];
+            // 纯id类型
+        } else if (attribute[0] == 'T' && attribute[1] == '@' && strlen(attribute) == 2) {
+            return "id";
+            // 对象类型
+        } else if (attribute[0] == 'T' && attribute[1] == '@') {
+            return (const char *) [[NSData dataWithBytes:(attribute + 3) length:strlen(attribute) - 4] bytes];
+        }
+    }
+    return "";
+}
 /// Get the Foundation class type from property info.
 static force_inline YYEncodingNSType YYClassGetNSType(Class cls) {
     if (!cls) return YYEncodingTypeNSUnknown;
@@ -1465,8 +1492,49 @@ static NSString *ModelDescription(NSObject *model) {
     }
     
     NSObject *one = [cls new];
-    if ([one yy_modelSetWithDictionary:dictionary]) return one;
+    if ([one yy_modelSetWithDictionary:dictionary]){
+        [self checkObj:one];
+        return one;
+    }
     return nil;
+}
+
+- (void)checkObj:(NSObject *)obj{
+    if ([obj respondsToSelector:@selector(oldValueToNewValue:classTypeName:)]){
+        @try{
+            unsigned int outCount, i;
+            //objc_property_t 数组获取
+            objc_property_t *properties = class_copyPropertyList([obj class], &outCount);
+            for (i = 0;i<outCount; i++){
+                // 单一的 objc_property_t
+                objc_property_t property = properties[i];
+                // 变量名获取
+                NSString *propertyName = [NSString stringWithUTF8String:property_getName(property)];
+                // 获取类型名称
+                const char * propertyTypeName = getPropertyType(property);
+                // 获取 property 值
+                id propertyValue = [obj valueForKey:propertyName];
+                id newValue = [(id<YYModel>)obj oldValueToNewValue:propertyValue classTypeName:propertyTypeName];
+                if (newValue != propertyValue){
+                    [obj setValue:newValue forKey:propertyName];
+                }
+                
+            }
+            
+            free(properties);
+            // 如需遍历父类, 但是不需要的
+            //            NSObject * subObj = obj.superclass;
+            //            if (subObj){
+            ////                NSLog(@"currentObj %@, subObjClassName---%@",[obj classForCoder],[subObj classForCoder]);
+            //                [self checkObj:subObj];
+            //            }
+            
+            
+            
+        }@catch(NSException *exp){
+            
+        }
+    }
 }
 
 - (BOOL)yy_modelSetWithJSON:(id)json {

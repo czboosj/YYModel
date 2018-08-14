@@ -434,7 +434,12 @@ NS_ASSUME_NONNULL_BEGIN
  @return Returns YES if the model is valid, or NO to ignore this model.
  */
 - (BOOL)modelCustomTransformToDictionary:(NSMutableDictionary *)dic;
-
+/**
+ 转换完成后执行, 老变量新变量的替换
+ (只遍历当前类, 忽略父类)
+ @return <#return value description#>
+ */
+- (id)oldValueToNewValue:(id)value classTypeName:(const char *)classTypeName;
 @end
 
 NS_ASSUME_NONNULL_END
